@@ -28,6 +28,11 @@ dev = [
 package = [
     "pyinstaller>=6",
 ]
+# Optional PDF backend — pulls PyTorch (~2 GB); NOT needed for the packaged
+# app, which always uses the default pymupdf4llm parser.
+docling = [
+    "docling>=2.0,<3",
+]
 
 [project.scripts]
 studybuddy = "studybuddy.app:main"

@@ -3,6 +3,7 @@
 import pytest
 
 import studybuddy.core.index as index_mod
+from studybuddy.core.documents import PageContent, ParsedDocument
 from studybuddy.core.index import index_paths, needs_reindex, prune_missing
 from studybuddy.core.store import Store
 
@@ -60,6 +61,25 @@ def test_prune_missing(store, tmp_path):
     removed = prune_missing(store, {str(a)})
     assert removed == [str(b)]
     assert [r.path for r in store.list_documents()] == [str(a)]
+
+
+def test_index_paths_forwards_pdf_parser(store, tmp_path, monkeypatch):
+    f = tmp_path / "doc.pdf"
+    f.write_bytes(b"%PDF-fake")
+    seen = {}
+
+    def fake_load(path, pdf_parser="pymupdf4llm"):
+        seen["pdf_parser"] = pdf_parser
+        return ParsedDocument(
+            path=path,
+            title=path.stem,
+            pages=[PageContent(page=1, text="body " * 50)],
+        )
+
+    monkeypatch.setattr(index_mod, "load_document", fake_load)
+    result = index_paths(store, [f], pdf_parser="docling")
+    assert seen["pdf_parser"] == "docling"
+    assert result.indexed == [str(f)]
 
 
 def test_progress_callback(store, tmp_path):

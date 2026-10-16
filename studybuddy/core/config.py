@@ -43,6 +43,7 @@ class Settings:
     ollama_base_url: str = DEFAULT_OLLAMA_URL
     ollama_model: str = DEFAULT_OLLAMA_MODEL
     # Indexing / retrieval tuning
+    pdf_parser: str = "pymupdf4llm"  # "pymupdf4llm" | "docling" (optional extra)
     chunk_size: int = 1000
     chunk_overlap: int = 200
     top_k: int = 6

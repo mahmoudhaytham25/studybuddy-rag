@@ -191,3 +191,18 @@ def test_settings_dialog_collects(qapp, store):
     assert s.gemini_api_key == "k123"
     assert s.provider == "gemini"
     d.close()
+
+
+def test_settings_dialog_pdf_parser(qapp):
+    from studybuddy.ui.settings_dialog import SettingsDialog
+
+    s = Settings(pdf_parser="docling")
+    d = SettingsDialog(s)
+    assert d.pdf_parser.currentIndex() == 1
+    d.pdf_parser.setCurrentIndex(0)
+    d._collect()
+    assert s.pdf_parser == "pymupdf4llm"
+    d.pdf_parser.setCurrentIndex(1)
+    d._collect()
+    assert s.pdf_parser == "docling"
+    d.close()

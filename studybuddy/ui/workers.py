@@ -28,6 +28,7 @@ class IndexWorker(QThread):
                 self._paths,
                 chunk_size=self._settings.chunk_size,
                 chunk_overlap=self._settings.chunk_overlap,
+                pdf_parser=self._settings.pdf_parser,
                 progress=lambda name, done, total: self.progressed.emit(
                     name, done, total
                 ),

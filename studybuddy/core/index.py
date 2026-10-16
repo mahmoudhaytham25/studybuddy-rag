@@ -43,6 +43,7 @@ def index_paths(
     chunk_overlap: int = 200,
     progress: ProgressCb | None = None,
     force: bool = False,
+    pdf_parser: str = "pymupdf4llm",
 ) -> IndexResult:
     files = collect_files(paths)
     result = IndexResult()
@@ -54,7 +55,7 @@ def index_paths(
             if not force and not needs_reindex(store, f):
                 result.skipped.append(str(f))
                 continue
-            doc = load_document(f)
+            doc = load_document(f, pdf_parser=pdf_parser)
             chunks = chunk_document(doc, chunk_size, chunk_overlap)
             if not chunks:
                 result.failed[str(f)] = "no usable text"

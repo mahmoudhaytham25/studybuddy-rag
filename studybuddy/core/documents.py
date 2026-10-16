@@ -3,6 +3,10 @@
 Every loader returns a ParsedDocument with per-page text so citations can carry
 page numbers. The markdown structure (headings, tables, lists) is preserved so
 the chunker can split along section boundaries rather than mid-paragraph.
+
+An optional Docling backend (better layout/table recovery, pulls PyTorch —
+install the ``docling`` extra) can be selected per Settings.pdf_parser. It is
+imported lazily so the app works — and packages — without it.
 """
 
 from __future__ import annotations
@@ -43,7 +47,9 @@ def file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def load_document(path: Path) -> ParsedDocument:
+def load_document(
+    path: Path, pdf_parser: str = "pymupdf4llm"
+) -> ParsedDocument:
     path = Path(path)
     ext = path.suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
@@ -51,6 +57,10 @@ def load_document(path: Path) -> ParsedDocument:
     if not path.is_file():
         raise DocumentError(f"File not found: {path}")
     if ext == ".pdf":
+        if pdf_parser == "docling":
+            return _load_pdf_docling(path)
+        if pdf_parser != "pymupdf4llm":
+            raise DocumentError(f"Unknown PDF parser: {pdf_parser}")
         return _load_pdf(path)
     return _load_text(path)
 
@@ -70,6 +80,44 @@ def _load_pdf(path: Path) -> ParsedDocument:
     if not any(p.text.strip() for p in pages):
         raise DocumentError(f"No extractable text in {path.name} (scanned PDF?)")
     return ParsedDocument(path=path, title=path.stem, pages=pages)
+
+
+def _load_pdf_docling(path: Path) -> ParsedDocument:
+    try:
+        from docling.document_converter import DocumentConverter
+    except ImportError as exc:
+        raise DocumentError(
+            "Docling parser selected but not installed — "
+            'pip install "studybuddy-rag[docling]"'
+        ) from exc
+
+    try:
+        doc = DocumentConverter().convert(str(path)).document
+    except Exception as exc:  # backend/model errors vary widely
+        raise DocumentError(f"Could not parse PDF {path.name}: {exc}") from exc
+
+    # Export per physical page so citations keep real page numbers: the
+    # serializer filters items by provenance internally, unlike the
+    # from_element/to_element slicing whose indices don't match
+    # iterate_items() (table cells inflate the element count).
+    page_nos = sorted(getattr(doc, "pages", None) or _prov_pages(doc))
+    pages = [
+        PageContent(page=n, text=doc.export_to_markdown(page_no=n).strip())
+        for n in page_nos
+    ]
+    if not any(p.text for p in pages):
+        raise DocumentError(f"No extractable text in {path.name} (scanned PDF?)")
+    return ParsedDocument(path=path, title=path.stem, pages=pages)
+
+
+def _prov_pages(doc) -> set[int]:
+    """Page numbers that carry content, taken from item provenance (first
+    provenance entry wins for items spanning pages)."""
+    return {
+        item.prov[0].page_no
+        for item, _level in doc.iterate_items()
+        if getattr(item, "prov", None)
+    }
 
 
 def _load_text(path: Path) -> ParsedDocument:

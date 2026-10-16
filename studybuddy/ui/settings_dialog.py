@@ -58,7 +58,18 @@ class SettingsDialog(QDialog):
         )
         self.rerank = QCheckBox("Rerank results (better answers, slightly slower)")
         self.rerank.setChecked(settings.rerank)
+        self.pdf_parser = QComboBox()
+        self.pdf_parser.addItems(
+            [
+                "pymupdf4llm (default)",
+                "Docling (better tables, needs extra install)",
+            ]
+        )
+        self.pdf_parser.setCurrentIndex(
+            1 if settings.pdf_parser == "docling" else 0
+        )
         tune.addRow("Sources per answer", self.top_k)
+        tune.addRow("PDF parser", self.pdf_parser)
         tune.addRow("Chunk size", self.chunk_size)
         tune.addRow("Chunk overlap", self.chunk_overlap)
         tune.addRow("", self.rerank)
@@ -136,6 +147,9 @@ class SettingsDialog(QDialog):
         s.chunk_size = self.chunk_size.value()
         s.chunk_overlap = self.chunk_overlap.value()
         s.rerank = self.rerank.isChecked()
+        s.pdf_parser = (
+            "docling" if self.pdf_parser.currentIndex() == 1 else "pymupdf4llm"
+        )
         return s
 
     def _save(self) -> None:

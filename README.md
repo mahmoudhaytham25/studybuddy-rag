@@ -16,6 +16,8 @@ retrieval pipeline.
   browser tab. Indexing and answer generation run on background threads.
 - **Structured PDF parsing** — `pymupdf4llm` converts pages to Markdown
   (headings, tables, lists) so chunking can follow document structure.
+  An optional **Docling** backend (better tables/complex layouts, opt-in
+  extra) is selectable in Settings → PDF parser — see below.
 - **Structure-aware chunking** — splits along the heading hierarchy first
   (each chunk keeps a `Lecture 3 > 3.2 Agile` breadcrumb), then size-splits
   within sections. Chunks get a contextual `Document/Section/Page` prefix
@@ -68,6 +70,22 @@ python -m studybuddy        # or: studybuddy
 Requires Python ≥ 3.10 whose `sqlite3` supports loadable extensions
 (standard python.org / Homebrew builds do; some pyenv/standalone builds
 don't — `pip install pysqlite3-binary` as a fallback).
+
+### Optional: Docling PDF backend
+
+[Docling](https://docling-project.github.io) (IBM) recovers complex layouts
+and tables more accurately than pymupdf4llm. It pulls in PyTorch (~2 GB
+download), so it stays an opt-in extra and is never bundled into the
+packaged releases:
+
+```bash
+pip install -e ".[docling]"
+```
+
+Then select **Docling** in Settings → PDF parser. Markdown is still emitted
+per page via Docling's provenance tracking, so citation page numbers stay
+exact. Switching parsers only affects files indexed afterwards — re-add a
+document (or delete and re-index) to re-parse it.
 
 ## Getting answers
 
@@ -132,5 +150,5 @@ artifacts and publishes them to GitHub Releases on `v*` tags.
 
 ## Stack
 
-Python · PySide6 · PyMuPDF/pymupdf4llm · fastembed (ONNX) · sqlite-vec ·
+Python · PySide6 · PyMuPDF/pymupdf4llm (+ optional Docling) · fastembed (ONNX) · sqlite-vec ·
 SQLite FTS5 · google-genai · Ollama · PyInstaller · pytest · GitHub Actions

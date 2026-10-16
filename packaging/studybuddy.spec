@@ -86,12 +86,33 @@ a = Analysis(
         # keep the bundle lean — none of these are used by StudyBuddy
         "torch",
         "torchvision",
+        "torchaudio",
         "matplotlib",
         "tkinter",
         "PyQt5",
         "PyQt6",
         "PySide2",
         "pytest",
+        # Docling is an optional extra never shipped in releases — modulegraph
+        # still traces the lazy `import docling` inside _load_pdf_docling, so
+        # exclude it plus its heavy ML stack even when installed in the
+        # build environment. (onnxruntime stays — fastembed needs it.)
+        "docling",
+        "docling_core",
+        "docling_ibm_models",
+        "docling_parse",
+        "transformers",
+        "accelerate",
+        "sentencepiece",
+        "safetensors",
+        "datasets",
+        "scipy",
+        "sklearn",
+        "pandas",
+        "cv2",
+        "easyocr",
+        "rapidocr",
+        "rapidocr_onnxruntime",
     ],
     noarchive=False,
 )
