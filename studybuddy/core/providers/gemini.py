@@ -20,7 +20,7 @@ import os
 import time
 from typing import Iterator
 
-from .base import ProviderError
+from .base import ChatMessage, ProviderError
 
 logger = logging.getLogger(__name__)
 
@@ -163,10 +163,38 @@ class GeminiProvider:
 
     # -- generation -----------------------------------------------------------
 
-    def generate(self, prompt: str) -> str:
+    @staticmethod
+    def _contents(prompt: str, history: list[ChatMessage] | None = None):
+        """The `contents` argument for generate_content: the bare prompt
+        string when there's no history (unchanged request shape), else a
+        role-labelled Content list so prior turns become real chat context
+        ("assistant" maps to Gemini's "model" role)."""
+        if not history:
+            return prompt
+        from google.genai import types
+
+        contents = [
+            types.Content(
+                role="model" if turn.get("role") == "assistant" else "user",
+                parts=[types.Part.from_text(text=turn.get("content", ""))],
+            )
+            for turn in history
+        ]
+        contents.append(
+            types.Content(
+                role="user", parts=[types.Part.from_text(text=prompt)]
+            )
+        )
+        return contents
+
+    def generate(
+        self, prompt: str, history: list[ChatMessage] | None = None
+    ) -> str:
         def call(model: str) -> str:
             resp = self._get_client().models.generate_content(
-                model=model, contents=prompt, config=self._config()
+                model=model,
+                contents=self._contents(prompt, history),
+                config=self._config(),
             )
             text = resp.text
             if not text or not text.strip():
@@ -178,12 +206,16 @@ class GeminiProvider:
 
         return self._run_chain(call)
 
-    def stream(self, prompt: str) -> Iterator[str]:
+    def stream(
+        self, prompt: str, history: list[ChatMessage] | None = None
+    ) -> Iterator[str]:
         yielded_any = False
 
         def call(model: str):
             for event in self._get_client().models.generate_content_stream(
-                model=model, contents=prompt, config=self._config()
+                model=model,
+                contents=self._contents(prompt, history),
+                config=self._config(),
             ):
                 if event.text:
                     yield event.text

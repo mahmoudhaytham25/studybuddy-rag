@@ -7,7 +7,7 @@ from typing import Iterator
 
 from .config import Settings
 from .embeddings import embed_query, rerank
-from .providers import ChatProvider
+from .providers import ChatMessage, ChatProvider
 from .store import ChunkHit, Store
 
 _PROMPT_TEMPLATE = """\
@@ -50,7 +50,11 @@ def build_prompt(question: str, hits: list[ChunkHit]) -> str:
 
 
 def answer(
-    store: Store, provider: ChatProvider, settings: Settings, question: str
+    store: Store,
+    provider: ChatProvider,
+    settings: Settings,
+    question: str,
+    history: list[ChatMessage] | None = None,
 ) -> Answer:
     hits = retrieve(store, settings, question)
     if not hits:
@@ -58,14 +62,23 @@ def answer(
             "I don't have any indexed material yet — add some documents "
             "to your library first."
         )
-    return Answer(provider.generate(build_prompt(question, hits)), hits)
+    return Answer(
+        provider.generate(build_prompt(question, hits), history=history),
+        hits,
+    )
 
 
 def answer_stream(
-    store: Store, provider: ChatProvider, settings: Settings, question: str
+    store: Store,
+    provider: ChatProvider,
+    settings: Settings,
+    question: str,
+    history: list[ChatMessage] | None = None,
 ) -> tuple[Iterator[str], list[ChunkHit]]:
     """Return (token iterator, source hits) — hits are resolved eagerly so the
-    caller can show citations immediately."""
+    caller can show citations immediately. `history` is prior plain-text
+    conversation turns (multi-turn follow-ups); the retrieved-context prompt
+    itself is always the current question only."""
     hits = retrieve(store, settings, question)
     if not hits:
         def empty() -> Iterator[str]:
@@ -75,4 +88,7 @@ def answer_stream(
             )
 
         return empty(), []
-    return provider.stream(build_prompt(question, hits)), hits
+    return (
+        provider.stream(build_prompt(question, hits), history=history),
+        hits,
+    )

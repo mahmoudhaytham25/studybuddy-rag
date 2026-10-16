@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self.docs.add_requested.connect(self._index_paths)
         self.docs.remove_requested.connect(self._remove_doc)
         self.chat.ask.connect(self._ask)
+        self.chat.notice.connect(self._show_notice)
 
         # Index whatever is already in the library (and prune vanished files).
         if settings.document_paths:
@@ -101,19 +102,28 @@ class MainWindow(QMainWindow):
         self.chat.start_answer()
         self.chat.set_busy(True)
         self._spawn(
-            ChatWorker(self.store, provider, self.settings, question),
+            ChatWorker(
+                self.store,
+                provider,
+                self.settings,
+                question,
+                history=self.chat.chat_history(),
+            ),
             token=self.chat.append_token,
             done=self._answer_done,
             failed=self._answer_failed,
         )
 
     def _answer_done(self, hits) -> None:
-        self.chat.finish_answer([h.citation() for h in hits])
+        self.chat.finish_answer(hits)
         self.chat.set_busy(False)
 
     def _answer_failed(self, msg: str) -> None:
         self.chat.add_error(msg)
         self.chat.set_busy(False)
+
+    def _show_notice(self, msg: str) -> None:
+        self.statusBar().showMessage(msg, 6000)
 
     # -- misc -----------------------------------------------------------------
 

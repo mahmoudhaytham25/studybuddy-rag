@@ -9,7 +9,7 @@ from typing import Iterator
 
 import httpx
 
-from .base import ProviderError
+from .base import ChatMessage, ProviderError
 from .gemini import _SYSTEM
 
 
@@ -20,22 +20,33 @@ class OllamaProvider:
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def _payload(self, prompt: str, stream: bool) -> dict:
+    def _payload(
+        self,
+        prompt: str,
+        stream: bool,
+        history: list[ChatMessage] | None = None,
+    ) -> dict:
+        messages = [{"role": "system", "content": _SYSTEM}]
+        for turn in history or []:
+            role = "assistant" if turn.get("role") == "assistant" else "user"
+            messages.append(
+                {"role": role, "content": turn.get("content", "")}
+            )
+        messages.append({"role": "user", "content": prompt})
         return {
             "model": self.model,
             "stream": stream,
-            "messages": [
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
+            "messages": messages,
             "options": {"temperature": 0.2},
         }
 
-    def generate(self, prompt: str) -> str:
+    def generate(
+        self, prompt: str, history: list[ChatMessage] | None = None
+    ) -> str:
         try:
             resp = httpx.post(
                 f"{self.base_url}/api/chat",
-                json=self._payload(prompt, stream=False),
+                json=self._payload(prompt, stream=False, history=history),
                 timeout=120,
             )
             resp.raise_for_status()
@@ -43,12 +54,14 @@ class OllamaProvider:
             raise ProviderError(self._explain(exc)) from exc
         return resp.json().get("message", {}).get("content", "")
 
-    def stream(self, prompt: str) -> Iterator[str]:
+    def stream(
+        self, prompt: str, history: list[ChatMessage] | None = None
+    ) -> Iterator[str]:
         try:
             with httpx.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
-                json=self._payload(prompt, stream=True),
+                json=self._payload(prompt, stream=True, history=history),
                 timeout=120,
             ) as resp:
                 resp.raise_for_status()

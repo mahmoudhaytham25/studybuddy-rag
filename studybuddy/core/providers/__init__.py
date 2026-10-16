@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from ..config import Settings
-from .base import ChatProvider, ProviderError
+from .base import ChatMessage, ChatProvider, ProviderError
 from .gemini import GeminiProvider
 from .ollama import OllamaProvider
 
 __all__ = [
+    "ChatMessage",
     "ChatProvider",
     "ProviderError",
     "GeminiProvider",

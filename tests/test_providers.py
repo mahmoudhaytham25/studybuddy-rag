@@ -63,6 +63,38 @@ def test_ollama_stream_yields_tokens(monkeypatch):
     assert list(p.stream("q")) == ["Hello", " world"]
 
 
+def test_ollama_payload_includes_history():
+    p = OllamaProvider("http://x", "m")
+    history = [
+        {"role": "user", "content": "u1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+    msgs = p._payload("q2", stream=False, history=history)["messages"]
+    assert [m["role"] for m in msgs] == [
+        "system", "user", "assistant", "user",
+    ]
+    assert msgs[1]["content"] == "u1"
+    assert msgs[2]["content"] == "a1"
+    assert msgs[-1]["content"] == "q2"
+    # No history → system + user only (unchanged request shape).
+    msgs = p._payload("q", stream=False)["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user"]
+
+
+def test_gemini_contents_maps_history_roles():
+    pytest.importorskip("google.genai")
+    p = GeminiProvider("key", "auto")
+    history = [
+        {"role": "user", "content": "u1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+    contents = p._contents("q2", history)
+    assert [c.role for c in contents] == ["user", "model", "user"]
+    assert contents[-1].parts[0].text == "q2"
+    # No history → bare prompt string (unchanged request shape).
+    assert p._contents("q") == "q"
+
+
 def test_ollama_connect_error_message(monkeypatch):
     def boom(*a, **k):
         raise httpx.ConnectError("refused")
