@@ -15,7 +15,8 @@ from platformdirs import user_config_dir, user_data_dir
 APP_NAME = "StudyBuddy"
 APP_AUTHOR = "MahmoudHaytham"
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# "auto" = start at the head of the Gemini fallback chain (newest flash)
+DEFAULT_GEMINI_MODEL = "auto"
 DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 

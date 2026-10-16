@@ -77,8 +77,23 @@ class SettingsDialog(QDialog):
         self.gemini_key = QLineEdit(s.gemini_api_key)
         self.gemini_key.setEchoMode(QLineEdit.Password)
         self.gemini_key.setPlaceholderText("AIza…")
-        self.gemini_model = QLineEdit(s.gemini_model)
-        hint = QLabel("Free key from Google AI Studio → aistudio.google.com")
+        self.gemini_model = QComboBox()
+        self.gemini_model.setEditable(True)
+        from ..core.providers.gemini import AUTO_MODEL, fallback_models
+
+        self.gemini_model.addItem("auto — newest first, falls back on quota")
+        for m in fallback_models():
+            self.gemini_model.addItem(m)
+        # prefill: either "auto" or a saved custom model name
+        idx = 0 if s.gemini_model == AUTO_MODEL else -1
+        if idx == -1:
+            self.gemini_model.setCurrentText(s.gemini_model)
+        else:
+            self.gemini_model.setCurrentIndex(0)
+        hint = QLabel(
+            "Free key from Google AI Studio → aistudio.google.com · "
+            "each model has a separate quota, exhausted ones fall back"
+        )
         hint.setWordWrap(True)
         form.addRow("API key", self.gemini_key)
         form.addRow("Model", self.gemini_model)
@@ -111,7 +126,10 @@ class SettingsDialog(QDialog):
         s = self._settings
         s.provider = "ollama" if self.provider.currentIndex() == 1 else "gemini"
         s.gemini_api_key = self.gemini_key.text().strip()
-        s.gemini_model = self.gemini_model.text().strip() or s.gemini_model
+        model_text = self.gemini_model.currentText().strip()
+        s.gemini_model = (
+            model_text if model_text.startswith("gemini-") else "auto"
+        )
         s.ollama_base_url = self.ollama_url.text().strip()
         s.ollama_model = self.ollama_model.text().strip()
         s.top_k = self.top_k.value()

@@ -27,6 +27,11 @@ retrieval pipeline.
 - **Cited answers** — every answer lists the document + page/section sources.
 - **Two providers** — Gemini API (free tier) by default, or fully-offline
   **Ollama** for zero-cloud usage. Switchable in Settings.
+- **Gemini model fallback chain** — `auto` starts at `gemini-3.8-flash` and
+  cascades down (3.7 → 3.6 → 3.5 → … → 2.5-flash-lite): each model has a
+  separate quota, so a rate-limited/unavailable/empty tier hops instead of
+  stalling. Pin a specific model in Settings and it still falls back below
+  it. Override the chain via `STUDYBUDDY_GEMINI_FALLBACK_MODELS`.
 - **Incremental indexing** — files are content-hashed; unchanged files never
   re-embed. Everything lives in one SQLite file under the OS app-data dir.
 - **Local embeddings** — `all-MiniLM-L6-v2` via fastembed/ONNX. No PyTorch —
@@ -51,7 +56,8 @@ don't — `pip install pysqlite3-binary` as a fallback).
 
 1. **File → Settings** — pick a provider:
    - **Gemini**: paste a free key from
-     [Google AI Studio](https://aistudio.google.com) (default `gemini-2.5-flash`)
+     [Google AI Studio](https://aistudio.google.com) — model `auto` (newest
+     flash first) or pick a specific one; failures cascade down the chain
    - **Ollama**: `ollama serve` + `ollama pull llama3.1:8b`, then Test connection
 2. **Add Files / Add Folder** — drop in PDFs, Markdown or TXT notes.
    First run downloads the embedding model (~100 MB, cached afterwards).
