@@ -57,9 +57,10 @@ binaries += collect_dynamic_libs("sqlite_vec")
 hiddenimports += ["sqlite_vec"]
 
 # store.py falls back to pysqlite3 when the bundled interpreter's sqlite3
-# lacks enable_load_extension. python.org / Homebrew builds (and the macOS /
-# Windows CI interpreters) all have it enabled, so this is normally absent —
-# bundle it only if it happens to be installed on the build machine.
+# lacks enable_load_extension. python.org / Homebrew builds have it (the
+# release workflow builds with Homebrew Python for exactly this reason —
+# the GH toolcache CPython does not), so this is normally absent — bundle
+# it only if it happens to be installed on the build machine.
 if importlib.util.find_spec("pysqlite3") is not None:
     binaries += collect_dynamic_libs("pysqlite3")
     hiddenimports += ["pysqlite3"]

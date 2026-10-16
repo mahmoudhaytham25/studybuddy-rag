@@ -23,30 +23,51 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # The toolcache Python on macOS is built without
+      # --enable-loadable-sqlite-extensions, so a bundled app can't load
+      # sqlite-vec (Homebrew CPython enables it — same as local builds).
+      - name: Install build Python (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install python@3.12 || brew upgrade python@3.12 || true
+          "$(brew --prefix python@3.12)/bin/python3.12" -m venv .venv-build
+          echo "PYBIN=$PWD/.venv-build/bin/python" >> "$GITHUB_ENV"
+
       - name: Install
-        run: pip install -e ".[package]"
+        shell: bash
+        run: '"${PYBIN:-python}" -m pip install -e ".[package]"'
 
       - name: PyInstaller build
-        run: python -m PyInstaller packaging/studybuddy.spec --clean --noconfirm
+        shell: bash
+        run: '"${PYBIN:-python}" -m PyInstaller packaging/studybuddy.spec --clean --noconfirm'
 
       - name: Smoke test the bundled app
         shell: bash
         run: |
           python - <<'EOF'
-          import os, subprocess, sys
+          import os, subprocess, sys, tempfile
           exe = ("dist/StudyBuddy.app/Contents/MacOS/StudyBuddy"
                  if sys.platform == "darwin" else "dist/StudyBuddy.exe")
           env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-          try:
-              p = subprocess.run([exe], env=env, timeout=30,
-                                 capture_output=True, text=True)
-              err, code = p.stderr or "", p.returncode
-          except subprocess.TimeoutExpired as e:
-              # still running after 30 s == the Qt event loop was reached
-              err = e.stderr or ""
-              if isinstance(err, bytes):
-                  err = err.decode(errors="replace")
-              code = 0
+          # Log to a file, not a pipe: the Windows onefile bootloader spawns
+          # a child that inherits handles — a pipe would never reach EOF
+          # after killing the parent and the step would hang.
+          with tempfile.TemporaryFile(mode="w+b") as logf:
+              p = subprocess.Popen([exe], env=env,
+                                   stdout=logf, stderr=logf)
+              try:
+                  code = p.wait(timeout=30)
+              except subprocess.TimeoutExpired:
+                  # still running == the Qt event loop was reached
+                  code = 0
+                  if sys.platform == "win32":
+                      subprocess.run(
+                          ["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                          capture_output=True)
+                  else:
+                      p.kill()
+              logf.seek(0)
+              err = logf.read().decode(errors="replace")
           if code != 0 or any(
               b in err for b in ("Traceback", "ImportError",
                                  "ModuleNotFoundError")
