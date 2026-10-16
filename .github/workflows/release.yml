@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[package]"
+
+      - name: PyInstaller build
+        run: python -m PyInstaller packaging/studybuddy.spec --clean --noconfirm
+
+      - name: Smoke test the bundled app
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import os, subprocess, sys
+          exe = ("dist/StudyBuddy.app/Contents/MacOS/StudyBuddy"
+                 if sys.platform == "darwin" else "dist/StudyBuddy.exe")
+          env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+          try:
+              p = subprocess.run([exe], env=env, timeout=30,
+                                 capture_output=True, text=True)
+              err, code = p.stderr or "", p.returncode
+          except subprocess.TimeoutExpired as e:
+              # still running after 30 s == the Qt event loop was reached
+              err = e.stderr or ""
+              if isinstance(err, bytes):
+                  err = err.decode(errors="replace")
+              code = 0
+          if code != 0 or any(
+              b in err for b in ("Traceback", "ImportError",
+                                 "ModuleNotFoundError")
+          ):
+              print(err)
+              sys.exit(1)
+          print("smoke test OK")
+          EOF
+
+      - name: Create DMG (macOS)
+        if: runner.os == 'macOS'
+        run: >
+          hdiutil create -volname StudyBuddy
+          -srcfolder dist/StudyBuddy.app
+          -ov -format UDZO
+          dist/StudyBuddy-macOS.dmg
+
+      - name: Create ZIP (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >
+          Compress-Archive -Path dist\StudyBuddy.exe
+          -DestinationPath dist\StudyBuddy-windows.zip -Force
+
+      - name: SHA256 checksums
+        shell: bash
+        run: |
+          cd dist
+          if command -v sha256sum >/dev/null; then
+            sha256sum StudyBuddy-* > "SHA256SUMS-${{ runner.os }}.txt"
+          else
+            shasum -a 256 StudyBuddy-* > "SHA256SUMS-${{ runner.os }}.txt"
+          fi
+          cat "SHA256SUMS-${{ runner.os }}.txt"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # on workflow_dispatch (branch ref) fall back to a snapshot tag
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('ci-build-{0}', github.run_number) }}
+          files: |
+            dist/StudyBuddy-*.dmg
+            dist/StudyBuddy-*.zip
+            dist/SHA256SUMS-*.txt

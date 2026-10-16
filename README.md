@@ -38,7 +38,24 @@ retrieval pipeline.
   keeps the packaged app small. Models cache after first download; retrieval
   then works offline.
 
+## Download
+
+Prebuilt apps for macOS and Windows are attached to
+[GitHub Releases](https://github.com/mahmoudhaytham25/studybuddy-rag/releases) —
+`StudyBuddy-macOS.dmg` and `StudyBuddy-windows.zip`, plus `SHA256SUMS-*.txt`
+checksums.
+
+The builds are unsigned, so the OS warns on first launch:
+
+- **macOS** — Gatekeeper may call the app "damaged" or from an unidentified
+  developer. Right-click → **Open** and confirm, or run
+  `xattr -dr com.apple.quarantine /Applications/StudyBuddy.app`
+  after copying it out of the DMG.
+- **Windows** — on the SmartScreen prompt click **More info → Run anyway**.
+
 ## Install & run
+
+To run from source instead:
 
 ```bash
 git clone https://github.com/mahmoudhaytham25/studybuddy-rag
@@ -100,10 +117,18 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## Packaging (WIP)
+## Packaging
 
-`pip install -e ".[package]"` then PyInstaller — a proper
-`studybuddy.spec` and signed installers land in a later milestone.
+```bash
+pip install -e ".[package]"
+pyinstaller packaging/studybuddy.spec --clean --noconfirm
+```
+
+produces `dist/StudyBuddy.app` (macOS) or a onefile `dist/StudyBuddy.exe`
+(Windows). `scripts/build_mac.sh` additionally wraps the `.app` into a DMG.
+ONNX models are deliberately not bundled — fastembed downloads them into the
+app-data dir on first run. `.github/workflows/release.yml` builds both
+artifacts and publishes them to GitHub Releases on `v*` tags.
 
 ## Stack
 
