@@ -26,14 +26,20 @@ retrieval pipeline.
 - **Hybrid retrieval** — vector search (sqlite-vec) **+** BM25 keyword search
   (SQLite FTS5) fused with Reciprocal Rank Fusion, then optional cross-encoder
   reranking (`bge-reranker-base`, ONNX).
-- **Cited answers** — every answer lists the document + page/section sources.
+- **Cited answers** — every answer lists the document + page/section
+  sources, rendered as clickable links that open the PDF at the cited page
+  (`file://…#page=N`).
+- **Multi-turn chat** — follow-up questions send prior conversation turns
+  to the LLM (bounded at 8 turns) while retrieval stays fresh per
+  question; **New chat** resets the conversation.
 - **Two providers** — Gemini API (free tier) by default, or fully-offline
   **Ollama** for zero-cloud usage. Switchable in Settings.
 - **Gemini model fallback chain** — `auto` starts at `gemini-3.8-flash` and
   cascades down (3.7 → 3.6 → 3.5 → … → 2.5-flash-lite): each model has a
   separate quota, so a rate-limited/unavailable/empty tier hops instead of
-  stalling. Pin a specific model in Settings and it still falls back below
-  it. Override the chain via `STUDYBUDDY_GEMINI_FALLBACK_MODELS`.
+  stalling. Pin a specific model in Settings and it is tried first, then
+  still cascades through the rest of the chain. Override the chain via
+  `STUDYBUDDY_GEMINI_FALLBACK_MODELS`.
 - **Incremental indexing** — files are content-hashed; unchanged files never
   re-embed. Everything lives in one SQLite file under the OS app-data dir.
 - **Local embeddings** — `all-MiniLM-L6-v2` via fastembed/ONNX. No PyTorch —
@@ -84,8 +90,9 @@ pip install -e ".[docling]"
 
 Then select **Docling** in Settings → PDF parser. Markdown is still emitted
 per page via Docling's provenance tracking, so citation page numbers stay
-exact. Switching parsers only affects files indexed afterwards — re-add a
-document (or delete and re-index) to re-parse it.
+exact. Switching parsers only affects files indexed afterwards — content
+hashing means an unchanged file in the library is skipped, so remove a
+document and re-add it to re-parse it.
 
 ## Getting answers
 
@@ -121,7 +128,7 @@ studybuddy/
     embeddings.py  fastembed wrapper (embed + rerank, lazy-loaded)
     store.py       SQLite + sqlite-vec + FTS5, RRF hybrid search
     index.py       hash-diffed incremental indexing
-    retrieval→rag  prompt build + streamed answers with citations
+    rag.py         retrieval + prompt build + streamed answers, citations
     providers/     ChatProvider protocol · Gemini · Ollama
   ui/              PySide6: MainWindow, DocumentPanel, ChatPanel,
                    SettingsDialog, QThread workers
@@ -134,6 +141,9 @@ tests/             pytest suite (core fully covered; UI smoke via offscreen Qt)
 pip install -e ".[dev]"
 pytest
 ```
+
+68 tests — `.github/workflows/ci.yml` runs the same suite on every push/PR
+with Qt offscreen.
 
 ## Packaging
 
